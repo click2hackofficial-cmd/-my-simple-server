@@ -1,0 +1,195 @@
+:root {
+    --background-dark: #1E1E1E;
+    --primary-dark: #121212;
+    --card-dark: #2C2C2C;
+    --text-primary: #FFFFFF;
+    --text-secondary: #B0B0B0;
+    --accent-blue: #3498DB;
+    --online-status: #2ECC71;
+    --offline-status: #E74C3C;
+    --button-gradient: linear-gradient(90deg, #8E44AD, #3498DB);
+}
+
+body {
+    background-color: var(--background-dark);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 15px;
+}
+
+#app {
+    max-width: 600px;
+    margin: auto;
+}
+
+header {
+    background-color: var(--primary-dark);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+    position: relative;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.5em;
+}
+
+header p {
+    color: var(--text-secondary);
+    margin: 5px 0 0;
+}
+
+header button {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--accent-blue);
+    font-size: 1.2em;
+    cursor: pointer;
+}
+
+.main-buttons, .control-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.control-buttons .full-width {
+    grid-column: 1 / -1;
+}
+
+button {
+    background: var(--button-gradient);
+    border: none;
+    color: var(--text-primary);
+    padding: 15px;
+    border-radius: 8px;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+.device-list-container, .sms-list-container, .form-list-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.device-card, .sms-item, .form-item {
+    background-color: var(--card-dark);
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid var(--accent-blue);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.device-info h3 {
+    margin: 0 0 5px 0;
+}
+
+.device-info p {
+    margin: 2px 0;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.status-dot.online { background-color: var(--online-status); }
+.status-dot.offline { background-color: var(--offline-status); }
+
+.delete-icon {
+    color: var(--offline-status);
+    font-size: 1.5em;
+    cursor: pointer;
+}
+
+.sms-section h2 {
+    margin-top: 30px;
+    border-bottom: 1px solid var(--card-dark);
+    padding-bottom: 10px;
+}
+
+/* Dialog Styles */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.dialog-box {
+    background-color: var(--card-dark);
+    padding: 25px;
+    border-radius: 12px;
+    border: 1px solid var(--accent-blue);
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.dialog-box h3 {
+    margin-top: 0;
+}
+
+.dialog-box input, .dialog-box textarea {
+    width: calc(100% - 20px);
+    padding: 10px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+    border: 1px solid #555;
+    background-color: #333;
+    color: var(--text-primary);
+    font-size: 1em;
+}
+
+.dialog-box textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.dialog-buttons button {
+    padding: 10px 20px;
+}
+
+.dialog-buttons .btn-cancel {
+    background: #555;
+}
