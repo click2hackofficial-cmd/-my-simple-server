@@ -1,7 +1,7 @@
 {
-  "name": "c2h-final-server-node20",
+  "name": "c2h-final-working-server",
   "version": "1.0.0",
-  "description": "Final working server for C2H Admin Panel with Node.js 20",
+  "description": "Final working server for C2H Admin Panel",
   "main": "api/index.js",
   "dependencies": {
     "sqlite3": "^5.1.7"
