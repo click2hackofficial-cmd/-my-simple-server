@@ -11,6 +11,7 @@
     --button-gradient: linear-gradient(90deg, #8E44AD, #3498DB);
     --success-green: #27AE60;
     --warning-orange: #F39C12;
+    --permanent-color: #9B59B6;
 }
 
 * {
@@ -24,12 +25,19 @@ body {
     margin: 0;
     padding: 15px;
     min-height: 100vh;
+    overflow-x: hidden;
 }
 
 #app {
     max-width: 600px;
     margin: auto;
     min-height: calc(100vh - 30px);
+    animation: fadeIn 0.5s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 /* Header Styles */
@@ -41,6 +49,7 @@ header {
     text-align: center;
     position: relative;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 header h1 {
@@ -50,6 +59,7 @@ header h1 {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    font-weight: 700;
 }
 
 header p {
@@ -70,11 +80,13 @@ header button {
     cursor: pointer;
     padding: 5px 10px;
     border-radius: 5px;
-    transition: background-color 0.2s;
+    transition: all 0.2s;
+    font-weight: bold;
 }
 
 header button:hover {
     background-color: rgba(52, 152, 219, 0.1);
+    transform: translateY(-50%) scale(1.05);
 }
 
 /* Button Styles */
@@ -100,11 +112,29 @@ button {
     cursor: pointer;
     transition: all 0.2s;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+button::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+button:hover::after {
+    opacity: 1;
 }
 
 button:hover {
     transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 button:active {
@@ -126,6 +156,13 @@ button:disabled {
     max-height: calc(100vh - 250px);
     overflow-y: auto;
     padding-right: 5px;
+    transition: opacity 0.3s ease;
+}
+
+.device-list-container.loading, 
+.sms-list-container.loading, 
+.form-list-container.loading {
+    opacity: 0.7;
 }
 
 /* Scrollbar Styling */
@@ -154,72 +191,126 @@ button:disabled {
     background-color: var(--card-dark);
     padding: 15px;
     border-radius: 8px;
-    border-left: 4px solid var(--accent-blue);
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
     transition: all 0.2s;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    position: relative;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* FIXED: Permanent device style */
+.device-card.permanent {
+    border-left: 4px solid var(--permanent-color);
+    animation: permanentGlow 3s infinite alternate;
+}
+
+@keyframes permanentGlow {
+    from { box-shadow: 0 2px 5px rgba(155, 89, 182, 0.3); }
+    to { box-shadow: 0 2px 10px rgba(155, 89, 182, 0.5); }
+}
+
+.device-card.permanent::before {
+    content: "PERMANENT";
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    background: var(--permanent-color);
+    color: white;
+    font-size: 0.6em;
+    padding: 2px 6px;
+    border-radius: 3px;
+    opacity: 0.8;
+    font-weight: bold;
+    letter-spacing: 0.5px;
 }
 
 .device-card:hover, .sms-item:hover, .form-item:hover {
-    transform: translateX(5px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: translateX(3px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .device-info h3 {
-    margin: 0 0 5px 0;
+    margin: 0 0 8px 0;
     color: var(--text-primary);
+    font-size: 1.1em;
 }
 
 .device-info p {
-    margin: 2px 0;
+    margin: 3px 0;
     color: var(--text-secondary);
-    font-size: 0.9em;
+    font-size: 0.85em;
+    line-height: 1.3;
 }
 
 /* Status Indicator */
 .status-indicator {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
+    min-width: 80px;
 }
 
 .status-dot {
-    width: 12px;
-    height: 12px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
-    box-shadow: 0 0 5px currentColor;
+    box-shadow: 0 0 8px currentColor;
 }
 
+/* FIXED: Status stable - no animation */
 .status-dot.online { 
     background-color: var(--online-status);
-    animation: pulse 2s infinite;
+    box-shadow: 0 0 8px var(--online-status);
 }
 
 .status-dot.offline { 
     background-color: var(--offline-status);
+    box-shadow: 0 0 8px var(--offline-status);
 }
 
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
+.status-text {
+    font-size: 0.8em;
+    font-weight: bold;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.online-text {
+    color: var(--online-status);
+    background: rgba(46, 204, 113, 0.1);
+}
+
+.offline-text {
+    color: var(--offline-status);
+    background: rgba(231, 76, 60, 0.1);
 }
 
 /* Delete Icon */
 .delete-icon {
     color: var(--offline-status);
-    font-size: 1.5em;
+    font-size: 1.3em;
     cursor: pointer;
-    padding: 5px;
+    padding: 6px;
     border-radius: 50%;
     transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
 }
 
 .delete-icon:hover {
-    background-color: rgba(231, 76, 60, 0.1);
+    background-color: rgba(231, 76, 60, 0.15);
     transform: scale(1.1);
+    color: #ff6b6b;
 }
 
 /* SMS Section */
@@ -228,11 +319,13 @@ button:disabled {
     border-bottom: 1px solid var(--card-dark);
     padding-bottom: 10px;
     color: var(--text-primary);
+    font-size: 1.2em;
 }
 
 /* SMS and Form Items */
 .sms-item, .form-item {
     cursor: default;
+    border-left: 4px solid var(--accent-blue);
 }
 
 .sms-item .delete-icon,
@@ -266,11 +359,6 @@ button:disabled {
     animation: fadeIn 0.3s ease;
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
 .dialog-box {
     background-color: var(--card-dark);
     padding: 25px;
@@ -285,11 +373,11 @@ button:disabled {
 @keyframes slideUp {
     from { 
         opacity: 0;
-        transform: translateY(20px);
+        transform: translateY(20px) scale(0.95);
     }
     to { 
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -298,20 +386,22 @@ button:disabled {
     color: var(--text-primary);
     border-bottom: 1px solid var(--accent-blue);
     padding-bottom: 10px;
+    font-size: 1.2em;
 }
 
 .dialog-box input, 
 .dialog-box textarea,
 .dialog-box select {
     width: calc(100% - 20px);
-    padding: 10px;
+    padding: 12px;
     margin-bottom: 15px;
     border-radius: 5px;
     border: 1px solid #555;
     background-color: #333;
     color: var(--text-primary);
-    font-size: 1em;
+    font-size: 0.95em;
     font-family: inherit;
+    transition: all 0.2s;
 }
 
 .dialog-box input:focus, 
@@ -319,7 +409,8 @@ button:disabled {
 .dialog-box select:focus {
     outline: none;
     border-color: var(--accent-blue);
-    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+    box-shadow: 0 0 8px rgba(52, 152, 219, 0.5);
+    background-color: #3a3a3a;
 }
 
 .dialog-box textarea {
@@ -342,11 +433,11 @@ button:disabled {
 }
 
 .dialog-buttons .btn-cancel {
-    background: #555;
+    background: linear-gradient(90deg, #666, #777);
 }
 
 .dialog-buttons .btn-cancel:hover {
-    background: #666;
+    background: linear-gradient(90deg, #777, #888);
 }
 
 /* Success and Error States */
@@ -368,17 +459,17 @@ button:disabled {
     border-color: var(--offline-status);
 }
 
-/* Loading Indicator */
-.loading {
+/* Loading Indicator - छोटा और subtle */
+.loading-indicator {
     display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 3px solid var(--text-secondary);
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--text-secondary);
     border-radius: 50%;
     border-top-color: var(--accent-blue);
     animation: spin 1s ease-in-out infinite;
     vertical-align: middle;
-    margin-right: 10px;
+    margin-right: 8px;
 }
 
 @keyframes spin {
@@ -390,9 +481,15 @@ button:disabled {
     text-align: center;
     color: var(--text-secondary);
     padding: 40px 20px;
-    background-color: var(--primary-dark);
+    background-color: rgba(255, 255, 255, 0.03);
     border-radius: 8px;
     margin: 20px 0;
+    border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
+.empty-state p:first-child {
+    font-size: 1.2em;
+    margin-bottom: 10px;
 }
 
 /* Responsive Design */
@@ -401,12 +498,22 @@ button:disabled {
         padding: 10px;
     }
     
+    #app {
+        min-height: calc(100vh - 20px);
+    }
+    
     header {
-        padding: 12px;
+        padding: 12px 10px;
     }
     
     header h1 {
-        font-size: 1.3em;
+        font-size: 1.2em;
+        padding: 0 30px;
+    }
+    
+    header button {
+        left: 10px;
+        padding: 4px 8px;
     }
     
     .main-buttons, .control-buttons {
@@ -422,51 +529,50 @@ button:disabled {
     .device-card, .sms-item, .form-item {
         padding: 12px;
         flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
+        align-items: stretch;
+        gap: 12px;
     }
     
     .status-indicator {
-        width: 100%;
+        flex-direction: row;
         justify-content: space-between;
+        width: 100%;
         margin-top: 10px;
-        padding-top: 10px;
+        padding-top: 12px;
         border-top: 1px solid rgba(255, 255, 255, 0.1);
     }
     
+    .device-card.permanent::before {
+        font-size: 0.55em;
+        padding: 2px 4px;
+    }
+    
     .dialog-box {
-        padding: 20px;
+        padding: 20px 15px;
         width: 95%;
+        max-width: 95%;
     }
     
     .dialog-buttons {
         flex-direction: column;
+        gap: 8px;
     }
     
     .dialog-buttons button {
         width: 100%;
+        padding: 12px;
+    }
+    
+    .device-list-container, .sms-list-container, .form-list-container {
+        max-height: calc(100vh - 200px);
     }
 }
 
-/* Animation for new items */
-.new-item {
-    animation: highlight 1s ease;
-}
-
-@keyframes highlight {
-    0% { background-color: rgba(52, 152, 219, 0.3); }
-    100% { background-color: var(--card-dark); }
-}
-
-/* Badge for notification */
-.badge {
-    background-color: var(--offline-status);
-    color: white;
-    border-radius: 10px;
-    padding: 2px 8px;
-    font-size: 0.8em;
-    margin-left: 5px;
-    vertical-align: middle;
+/* Mobile landscape */
+@media (max-height: 500px) and (orientation: landscape) {
+    .device-list-container, .sms-list-container, .form-list-container {
+        max-height: 250px;
+    }
 }
 
 /* Tooltip style for icons */
@@ -482,23 +588,45 @@ button:disabled {
     transform: translateX(-50%);
     background-color: var(--primary-dark);
     color: var(--text-primary);
-    padding: 5px 10px;
+    padding: 6px 12px;
     border-radius: 4px;
     font-size: 0.8em;
     white-space: nowrap;
     z-index: 100;
     border: 1px solid var(--accent-blue);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
-}
-
-/* Selection style */
-::selection {
-    background-color: var(--accent-blue);
-    color: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
 }
 
 /* Focus outline for accessibility */
 :focus-visible {
     outline: 2px solid var(--accent-blue);
     outline-offset: 2px;
+}
+
+/* Selection style */
+::selection {
+    background-color: rgba(52, 152, 219, 0.3);
+    color: white;
+}
+
+/* Smooth transitions */
+.device-card, .sms-item, .form-item, button, .dialog-box {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Page transition */
+#admin-panel, #device-control-panel, #form-list-panel {
+    animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0;
+        transform: translateX(10px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateX(0);
+    }
 }
