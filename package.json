@@ -1,0 +1,9 @@
+{
+  "name": "simple-c2h-server",
+  "version": "1.0.0",
+  "description": "A single-file server for C2H Admin Panel",
+  "main": "api/index.js",
+  "dependencies": {
+    "better-sqlite3": "^9.4.3"
+  }
+}
