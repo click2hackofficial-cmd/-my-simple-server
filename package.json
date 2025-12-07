@@ -1,13 +1,12 @@
 {
-  "name": "c2h-ultimate-fix-server",
+  "name": "c2h-ultimate-final-fix",
   "version": "1.0.0",
-  "description": "Ultimate fix for C2H Admin Panel on Vercel",
+  "description": "Final working server for C2H Admin Panel with Node.js 20",
   "main": "api/index.js",
   "dependencies": {
-    "better-sqlite3": "8.5.0",
-    "prebuild-install": "^7.1.1"
+    "sqlite3": "^5.1.7"
   },
   "engines": {
-    "node": "18.x"
+    "node": "20.x"
   }
 }
