@@ -1,12 +1,12 @@
 {
-  "name": "c2h-ultimate-final-fix",
+  "name": "c2h-node24-fix",
   "version": "1.0.0",
-  "description": "Final working server for C2H Admin Panel with Node.js 20",
+  "description": "Final server for C2H on Node.js 24",
   "main": "api/index.js",
   "dependencies": {
     "sqlite3": "^5.1.7"
   },
   "engines": {
-    "node": "20.x"
+    "node": "24.x"
   }
 }
