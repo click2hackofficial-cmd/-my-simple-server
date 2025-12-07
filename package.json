@@ -1,9 +1,12 @@
 {
-  "name": "simple-c2h-server",
+  "name": "c2h-server-fixed",
   "version": "1.0.0",
-  "description": "A single-file server for C2H Admin Panel",
+  "description": "Fixed single-file server for C2H Admin Panel",
   "main": "api/index.js",
   "dependencies": {
     "better-sqlite3": "^9.4.3"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
