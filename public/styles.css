@@ -5,9 +5,16 @@
     --text-primary: #FFFFFF;
     --text-secondary: #B0B0B0;
     --accent-blue: #3498DB;
+    --accent-purple: #8E44AD;
     --online-status: #2ECC71;
     --offline-status: #E74C3C;
     --button-gradient: linear-gradient(90deg, #8E44AD, #3498DB);
+    --success-green: #27AE60;
+    --warning-orange: #F39C12;
+}
+
+* {
+    box-sizing: border-box;
 }
 
 body {
@@ -16,13 +23,16 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
     margin: 0;
     padding: 15px;
+    min-height: 100vh;
 }
 
 #app {
     max-width: 600px;
     margin: auto;
+    min-height: calc(100vh - 30px);
 }
 
+/* Header Styles */
 header {
     background-color: var(--primary-dark);
     padding: 15px;
@@ -30,16 +40,22 @@ header {
     margin-bottom: 20px;
     text-align: center;
     position: relative;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
 }
 
 header h1 {
     margin: 0;
     font-size: 1.5em;
+    background: var(--button-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 header p {
     color: var(--text-secondary);
     margin: 5px 0 0;
+    font-size: 0.9em;
 }
 
 header button {
@@ -52,8 +68,16 @@ header button {
     color: var(--accent-blue);
     font-size: 1.2em;
     cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: background-color 0.2s;
 }
 
+header button:hover {
+    background-color: rgba(52, 152, 219, 0.1);
+}
+
+/* Button Styles */
 .main-buttons, .control-buttons {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -74,19 +98,58 @@ button {
     font-size: 1em;
     font-weight: bold;
     cursor: pointer;
-    transition: transform 0.2s;
+    transition: all 0.2s;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 button:active {
-    transform: scale(0.98);
+    transform: translateY(0);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
+/* List Containers */
 .device-list-container, .sms-list-container, .form-list-container {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    max-height: calc(100vh - 250px);
+    overflow-y: auto;
+    padding-right: 5px;
 }
 
+/* Scrollbar Styling */
+.device-list-container::-webkit-scrollbar,
+.sms-list-container::-webkit-scrollbar,
+.form-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.device-list-container::-webkit-scrollbar-track,
+.sms-list-container::-webkit-scrollbar-track,
+.form-list-container::-webkit-scrollbar-track {
+    background: var(--primary-dark);
+    border-radius: 3px;
+}
+
+.device-list-container::-webkit-scrollbar-thumb,
+.sms-list-container::-webkit-scrollbar-thumb,
+.form-list-container::-webkit-scrollbar-thumb {
+    background: var(--accent-blue);
+    border-radius: 3px;
+}
+
+/* Card Styles */
 .device-card, .sms-item, .form-item {
     background-color: var(--card-dark);
     padding: 15px;
@@ -96,10 +159,18 @@ button:active {
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.device-card:hover, .sms-item:hover, .form-item:hover {
+    transform: translateX(5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .device-info h3 {
     margin: 0 0 5px 0;
+    color: var(--text-primary);
 }
 
 .device-info p {
@@ -108,6 +179,7 @@ button:active {
     font-size: 0.9em;
 }
 
+/* Status Indicator */
 .status-indicator {
     display: flex;
     align-items: center;
@@ -118,21 +190,64 @@ button:active {
     width: 12px;
     height: 12px;
     border-radius: 50%;
+    box-shadow: 0 0 5px currentColor;
 }
 
-.status-dot.online { background-color: var(--online-status); }
-.status-dot.offline { background-color: var(--offline-status); }
+.status-dot.online { 
+    background-color: var(--online-status);
+    animation: pulse 2s infinite;
+}
 
+.status-dot.offline { 
+    background-color: var(--offline-status);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Delete Icon */
 .delete-icon {
     color: var(--offline-status);
     font-size: 1.5em;
     cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    transition: all 0.2s;
 }
 
+.delete-icon:hover {
+    background-color: rgba(231, 76, 60, 0.1);
+    transform: scale(1.1);
+}
+
+/* SMS Section */
 .sms-section h2 {
     margin-top: 30px;
     border-bottom: 1px solid var(--card-dark);
     padding-bottom: 10px;
+    color: var(--text-primary);
+}
+
+/* SMS and Form Items */
+.sms-item, .form-item {
+    cursor: default;
+}
+
+.sms-item .delete-icon,
+.form-item .delete-icon {
+    margin-left: 10px;
+}
+
+.sms-item div p:first-child,
+.form-item div p:first-child {
+    margin-top: 0;
+}
+
+.sms-item div p:last-child,
+.form-item div p:last-child {
+    margin-bottom: 0;
 }
 
 /* Dialog Styles */
@@ -147,6 +262,13 @@ button:active {
     justify-content: center;
     align-items: center;
     z-index: 1000;
+    backdrop-filter: blur(2px);
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 .dialog-box {
@@ -156,14 +278,31 @@ button:active {
     border: 1px solid var(--accent-blue);
     width: 90%;
     max-width: 400px;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from { 
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .dialog-box h3 {
     margin-top: 0;
+    color: var(--text-primary);
+    border-bottom: 1px solid var(--accent-blue);
+    padding-bottom: 10px;
 }
 
-.dialog-box input, .dialog-box textarea {
+.dialog-box input, 
+.dialog-box textarea,
+.dialog-box select {
     width: calc(100% - 20px);
     padding: 10px;
     margin-bottom: 15px;
@@ -172,13 +311,24 @@ button:active {
     background-color: #333;
     color: var(--text-primary);
     font-size: 1em;
+    font-family: inherit;
+}
+
+.dialog-box input:focus, 
+.dialog-box textarea:focus,
+.dialog-box select:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
 }
 
 .dialog-box textarea {
     min-height: 100px;
     resize: vertical;
+    line-height: 1.4;
 }
 
+/* Dialog Buttons */
 .dialog-buttons {
     display: flex;
     justify-content: flex-end;
@@ -188,8 +338,167 @@ button:active {
 
 .dialog-buttons button {
     padding: 10px 20px;
+    min-width: 80px;
 }
 
 .dialog-buttons .btn-cancel {
     background: #555;
+}
+
+.dialog-buttons .btn-cancel:hover {
+    background: #666;
+}
+
+/* Success and Error States */
+.dialog-box.success {
+    border-color: var(--success-green);
+}
+
+.dialog-box.error {
+    border-color: var(--offline-status);
+}
+
+.dialog-box.success h3 {
+    color: var(--success-green);
+    border-color: var(--success-green);
+}
+
+.dialog-box.error h3 {
+    color: var(--offline-status);
+    border-color: var(--offline-status);
+}
+
+/* Loading Indicator */
+.loading {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid var(--text-secondary);
+    border-radius: 50%;
+    border-top-color: var(--accent-blue);
+    animation: spin 1s ease-in-out infinite;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 40px 20px;
+    background-color: var(--primary-dark);
+    border-radius: 8px;
+    margin: 20px 0;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    body {
+        padding: 10px;
+    }
+    
+    header {
+        padding: 12px;
+    }
+    
+    header h1 {
+        font-size: 1.3em;
+    }
+    
+    .main-buttons, .control-buttons {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    button {
+        padding: 12px;
+        font-size: 0.9em;
+    }
+    
+    .device-card, .sms-item, .form-item {
+        padding: 12px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    
+    .status-indicator {
+        width: 100%;
+        justify-content: space-between;
+        margin-top: 10px;
+        padding-top: 10px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .dialog-box {
+        padding: 20px;
+        width: 95%;
+    }
+    
+    .dialog-buttons {
+        flex-direction: column;
+    }
+    
+    .dialog-buttons button {
+        width: 100%;
+    }
+}
+
+/* Animation for new items */
+.new-item {
+    animation: highlight 1s ease;
+}
+
+@keyframes highlight {
+    0% { background-color: rgba(52, 152, 219, 0.3); }
+    100% { background-color: var(--card-dark); }
+}
+
+/* Badge for notification */
+.badge {
+    background-color: var(--offline-status);
+    color: white;
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 0.8em;
+    margin-left: 5px;
+    vertical-align: middle;
+}
+
+/* Tooltip style for icons */
+[title] {
+    position: relative;
+}
+
+[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--primary-dark);
+    color: var(--text-primary);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    white-space: nowrap;
+    z-index: 100;
+    border: 1px solid var(--accent-blue);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* Selection style */
+::selection {
+    background-color: var(--accent-blue);
+    color: white;
+}
+
+/* Focus outline for accessibility */
+:focus-visible {
+    outline: 2px solid var(--accent-blue);
+    outline-offset: 2px;
 }
